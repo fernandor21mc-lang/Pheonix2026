@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Viaje de Golf 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --sand: #F5F0E3;
+    --fairway: #1F4B3A;
+    --fairway-light: #2E6B50;
+    --moss: #6B8F6E;
+    --clay: #B65530;
+    --ink: #1B2420;
+    --paper: #FFFFFF;
+    --line: #DCD5C2;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: var(--sand); color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, .serif { font-family: 'Fraunces', serif; }
+
+  header {
+    background: var(--fairway); color: var(--sand);
+    padding: 18px 20px 16px;
+    padding-top: calc(18px + env(safe-area-inset-top, 0px));
+  }
+  header h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  header p { margin: 2px 0 0; font-size: 12.5px; color: #C9DDCE; }
+
+  nav {
+    display: flex; overflow-x: auto; background: var(--fairway-light);
+    padding: 0 12px; gap: 2px;
+  }
+  nav button {
+    background: none; border: none; color: #DCEEE1; padding: 11px 14px;
+    font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;
+    border-bottom: 3px solid transparent; font-family: inherit;
+  }
+  nav button.active { color: #fff; border-bottom-color: var(--clay); font-weight: 600; }
+
+  main { padding: 16px; max-width: 720px; margin: 0 auto; padding-bottom: 60px; }
+
+  .card {
+    background: var(--paper); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px; margin-bottom: 14px;
+  }
+  .card h3 { margin: 0 0 4px; font-size: 17px; font-weight: 600; }
+  .muted { color: #7A7264; font-size: 12.5px; }
+
+  label { display: block; font-size: 12px; color: #7A7264; margin-bottom: 4px; font-weight: 500; }
+  input, select {
+    width: 100%; padding: 9px 10px; border-radius: 7px; border: 1px solid var(--line);
+    font-size: 14px; font-family: inherit; background: #fff; color: var(--ink);
+  }
+  .row { display: flex; gap: 10px; margin-bottom: 10px; }
+  .row > div { flex: 1; }
+
+  button.primary {
+    background: var(--fairway); color: #fff; border: none; border-radius: 8px;
+    padding: 11px 18px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  button.secondary {
+    background: none; border: 1px solid var(--fairway); color: var(--fairway);
+    border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  button:disabled { opacity: 0.4; cursor: default; }
+
+  .foursome-tag {
+    display: inline-block; font-size: 11px; font-weight: 600; color: var(--clay);
+    text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 8px;
+  }
+
+  table.scorecard { border-collapse: collapse; width: 100%; font-size: 13px; }
+  table.scorecard th, table.scorecard td {
+    border: 1px solid var(--line); text-align: center; padding: 4px 2px;
+  }
+  table.scorecard th { background: #F0EBDC; font-weight: 600; font-size: 11px; color: #7A7264; }
+  table.scorecard td.name { text-align: left; padding-left: 8px; font-weight: 600; white-space: nowrap; }
+  table.scorecard input {
+    width: 32px; padding: 4px 2px; text-align: center; border: none; border-radius: 4px;
+    font-size: 13px; background: #FAF7EF;
+  }
+  table.scorecard input:focus { outline: 2px solid var(--fairway-light); background: #fff; }
+  .scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
+
+  .leader-row {
+    display: flex; align-items: center; gap: 12px; padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .leader-row:last-child { border-bottom: none; }
+  .leader-pos {
+    width: 26px; height: 26px; border-radius: 50%; background: #F0EBDC;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: var(--fairway); flex-shrink: 0;
+  }
+  .leader-row:nth-child(1) .leader-pos { background: var(--clay); color: #fff; }
+  .leader-name { flex: 1; font-weight: 600; font-size: 14.5px; }
+  .leader-pts { font-size: 17px; font-weight: 700; color: var(--fairway); font-family: 'Fraunces', serif; }
+  .leader-detail { font-size: 11px; color: #7A7264; margin-top: 1px; }
+
+  .day-summary-pill {
+    display: inline-block; font-size: 11px; padding: 3px 9px; border-radius: 20px;
+    background: #E8F0E9; color: var(--fairway); font-weight: 600; margin-bottom: 10px;
+  }
+  .format-pill {
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+    color: var(--moss);
+  }
+
+  .player-chip {
+    display: inline-flex; align-items: center; gap: 6px; background: #F0EBDC;
+    border-radius: 20px; padding: 6px 10px 6px 6px; font-size: 12.5px; margin: 3px;
+  }
+  .player-chip .x { cursor: pointer; color: #B65530; font-weight: 700; padding: 0 3px; }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: #9A927F; font-size: 13.5px; }
+
+  .toast {
+    position: fixed; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); left: 50%;
+    transform: translateX(-50%); background: var(--ink); color: #fff;
+    padding: 9px 18px; border-radius: 20px; font-size: 12.5px; opacity: 0;
+    transition: opacity 0.25s; pointer-events: none; z-index: 999;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 class="serif">⛳ Viaje de Golf</h1>
+  <p id="subtitulo">3 días · 3 campos · 12 jugadores</p>
+</header>
+
+<nav id="nav"></nav>
+<main id="main"><div class="empty-state">Cargando...</div></main>
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://xnrcrruvbwoeorbltumv.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhucmNycnV2YndvZW9yYmx0dW12Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxOTA2NTAsImV4cCI6MjEwNTc2NjY1MH0.HXtWz-2aYqAeaiIjvCiavFiF0X6TL3sUG7OUhbR-mfc';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let jugadores = [];
+let dias = [];
+let scoresRows = [];
+let tab = 'config';
+
+const FORMATOS = { stableford: 'Stableford', net: 'Stroke Play (neto)', skins: 'Skins' };
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+function scoresDe(diaId, jugadorId) {
+  const row = scoresRows.find(r => r.dia_id === diaId && r.jugador_id === jugadorId);
+  return row ? row.scores : Array(18).fill(null);
+}
+
+async function cargarTodo() {
+  const [{ data: j }, { data: d }, { data: s }] = await Promise.all([
+    sb.from('jugadores').select('*').order('nombre'),
+    sb.from('dias').select('*').order('orden'),
+    sb.from('scores').select('*'),
+  ]);
+  jugadores = j || [];
+  dias = d || [];
+  scoresRows = s || [];
+  render();
+}
+
+function suscribirRealtime() {
+  sb.channel('viaje-golf-cambios')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'jugadores' }, cargarTodo)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'dias' }, cargarTodo)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, cargarTodo)
+    .subscribe();
+}
+
+function strokesEnHoyo(handicap, strokeIndex) {
+  const base = Math.floor(handicap / 18);
+  const extra = (strokeIndex <= (handicap % 18)) ? 1 : 0;
+  return base + extra;
+}
+
+function stablefordPts(netScore, par) {
+  const dif = netScore - par;
+  if (dif <= -3) return 5;
+  if (dif === -2) return 4;
+  if (dif === -1) return 3;
+  if (dif === 0) return 2;
+  if (dif === 1) return 1;
+  return 0;
+}
+
+function calcularResultadoDia(dia) {
+  const jugadoresDia = dia.foursomes.flat().filter(Boolean);
+  const resultado = {};
+  let mejorEsMenor = false;
+
+  if (dia.formato === 'net') {
+    mejorEsMenor = true;
+    jugadoresDia.forEach(jid => {
+      const jug = jugadores.find(j => j.id === jid);
+      const sc = scoresDe(dia.id, jid);
+      if (!jug || sc.some(s => s === null || s === undefined)) return;
+      const totalBruto = sc.reduce((a, b) => a + b, 0);
+      resultado[jid] = totalBruto - (jug.handicap || 0);
+    });
+  } else if (dia.formato === 'stableford') {
+    mejorEsMenor = false;
+    jugadoresDia.forEach(jid => {
+      const jug = jugadores.find(j => j.id === jid);
+      const sc = scoresDe(dia.id, jid);
+      if (!jug || sc.some(s => s === null || s === undefined)) return;
+      let pts = 0;
+      for (let h = 0; h < 18; h++) {
+        const strokes = strokesEnHoyo(jug.handicap || 0, dia.stroke_index[h]);
+        const neto = sc[h] - strokes;
+        pts += stablefordPts(neto, dia.pares[h]);
+      }
+      resultado[jid] = pts;
+    });
+  } else if (dia.formato === 'skins') {
+    mejorEsMenor = false;
+    dia.foursomes.forEach(grupo => {
+      const jugadoresGrupo = grupo.filter(Boolean);
+      if (jugadoresGrupo.length < 2) return;
+      jugadoresGrupo.forEach(jid => { resultado[jid] = 0; });
+      for (let h = 0; h < 18; h++) {
+        let mejorNeto = Infinity, ganador = null, empatados = 0;
+        jugadoresGrupo.forEach(jid => {
+          const jug = jugadores.find(j => j.id === jid);
+          const sc = scoresDe(dia.id, jid);
+          if (!jug || sc[h] === null || sc[h] === undefined) return;
+          const strokes = strokesEnHoyo(jug.handicap || 0, dia.stroke_index[h]);
+          const neto = sc[h] - strokes;
+          if (neto < mejorNeto) { mejorNeto = neto; ganador = jid; empatados = 1; }
+          else if (neto === mejorNeto) { empatados++; }
+        });
+        if (ganador && empatados === 1) resultado[ganador]++;
+      }
+    });
+    jugadoresDia.forEach(jid => {
+      const sc = scoresDe(dia.id, jid);
+      if (sc.some(s => s === null || s === undefined)) delete resultado[jid];
+    });
+  }
+
+  return { resultado, mejorEsMenor };
+}
+
+function puntosDelDia(dia) {
+  const { resultado, mejorEsMenor } = calcularResultadoDia(dia);
+  const entries = Object.entries(resultado);
+  if (entries.length === 0) return {};
+  entries.sort((a, b) => mejorEsMenor ? a[1] - b[1] : b[1] - a[1]);
+  const puntos = {};
+  let i = 0;
+  while (i < entries.length) {
+    let j = i;
+    while (j + 1 < entries.length && entries[j + 1][1] === entries[i][1]) j++;
+    const rangoPts = [];
+    for (let k = i; k <= j; k++) rangoPts.push(12 - k);
+    const promedio = rangoPts.reduce((a, b) => a + b, 0) / rangoPts.length;
+    for (let k = i; k <= j; k++) puntos[entries[k][0]] = promedio;
+    i = j + 1;
+  }
+  return puntos;
+}
+
+function tablaGeneral() {
+  const totales = {};
+  jugadores.forEach(j => { totales[j.id] = { nombre: j.nombre, total: 0, detalle: [] }; });
+  dias.forEach(dia => {
+    const pts = puntosDelDia(dia);
+    jugadores.forEach(j => {
+      const p = pts[j.id] || 0;
+      totales[j.id].total += p;
+      totales[j.id].detalle.push(p);
+    });
+  });
+  return Object.values(totales).sort((a, b) => b.total - a.total);
+}
+
+function render() {
+  document.getElementById('subtitulo').textContent = `${jugadores.length} jugadores`;
+
+  const navEl = document.getElementById('nav');
+  const tabs = [
+    { id: 'config', label: 'Configuración' },
+    ...dias.map((d, i) => ({ id: d.id, label: `Día ${i + 1}` })),
+    { id: 'tabla', label: 'Tabla General' },
+  ];
+  navEl.innerHTML = tabs.map(t =>
+    `<button class="${tab === t.id ? 'active' : ''}" onclick="setTab('${t.id}')">${t.label}</button>`
+  ).join('');
+
+  const main = document.getElementById('main');
+  if (tab === 'config') main.innerHTML = renderConfig();
+  else if (tab === 'tabla') main.innerHTML = renderTabla();
+  else main.innerHTML = renderDia(dias.find(d => d.id === tab));
+}
+
+function setTab(t) { tab = t; render(); }
+window.setTab = setTab;
+
+function renderConfig() {
+  let html = `<div class="card">
+    <h3>Jugadores <span class="muted">(${jugadores.length}/12)</span></h3>
+    <div style="margin: 10px 0;">
+      ${jugadores.map(j => `
+        <span class="player-chip">${j.nombre} · hcp ${j.handicap}
+          <span class="x" onclick="quitarJugador('${j.id}')">✕</span>
+        </span>
+      `).join('')}
+    </div>
+    <div class="row">
+      <div style="flex:2"><label>Nombre</label><input id="nuevo-nombre" placeholder="Nombre del jugador" /></div>
+      <div style="flex:1"><label>Hándicap</label><input id="nuevo-hcp" type="number" step="0.1" placeholder="12" /></div>
+    </div>
+    <button class="secondary" onclick="agregarJugador()">+ Agregar jugador</button>
+  </div>`;
+
+  dias.forEach((dia, i) => {
+    html += `<div class="card">
+      <h3>Día ${i + 1}</h3>
+      <div class="row">
+        <div><label>Fecha</label><input type="date" value="${dia.fecha || ''}" onchange="actualizarDia('${dia.id}','fecha',this.value)" /></div>
+        <div><label>Campo</label><input value="${dia.campo || ''}" placeholder="Nombre del campo" onchange="actualizarDia('${dia.id}','campo',this.value)" /></div>
+      </div>
+      <label>Formato de juego</label>
+      <select onchange="actualizarDia('${dia.id}','formato',this.value)">
+        ${Object.entries(FORMATOS).map(([k, v]) => `<option value="${k}" ${dia.formato === k ? 'selected' : ''}>${v}</option>`).join('')}
+      </select>
+      <div style="margin-top:12px;">
+        <label>Foursomes</label>
+        ${dia.foursomes.map((grupo, gi) => `
+          <div class="foursome-tag">Grupo ${gi + 1}</div>
+          <div class="row" style="flex-wrap:wrap; margin-bottom:8px;">
+            ${[0,1,2,3].map(slot => `
+              <select style="flex:1; min-width:120px;" onchange="asignarFoursome('${dia.id}',${gi},${slot},this.value)">
+                <option value="">—</option>
+                ${jugadores.map(j => `<option value="${j.id}" ${grupo[slot]===j.id?'selected':''}>${j.nombre}</option>`).join('')}
+              </select>
+            `).join('')}
+          </div>
+        `).join('')}
+      </div>
+      <button class="secondary" onclick="toggleParesInput('${dia.id}')" style="margin-top:6px;">Editar par / stroke index de hoyo</button>
+      <div id="pares-${dia.id}" style="display:none; margin-top:10px;">
+        <div class="scroll-x"><table class="scorecard"><thead><tr><th>Hoyo</th>${Array.from({length:18},(_,i)=>`<th>${i+1}</th>`).join('')}</tr></thead>
+        <tbody>
+          <tr><td class="name">Par</td>${dia.pares.map((p,h)=>`<td><input value="${p}" onchange="actualizarArrayDia('${dia.id}','pares',${h},this.value)"/></td>`).join('')}</tr>
+          <tr><td class="name">S.I.</td>${dia.stroke_index.map((s,h)=>`<td><input value="${s}" onchange="actualizarArrayDia('${dia.id}','stroke_index',${h},this.value)"/></td>`).join('')}</tr>
+        </tbody></table></div>
+      </div>
+    </div>`;
+  });
+
+  return html;
+}
+
+function renderDia(dia) {
+  if (!dia) return '<div class="empty-state">Día no encontrado</div>';
+  let html = `<div class="day-summary-pill">${dia.campo || 'Campo sin definir'} ${dia.fecha ? '· ' + dia.fecha : ''}</div>
+    <div class="format-pill" style="margin-bottom:14px;">Formato: ${FORMATOS[dia.formato]}</div>`;
+
+  dia.foursomes.forEach((grupo, gi) => {
+    const jugadoresGrupo = grupo.map(jid => jugadores.find(j => j.id === jid)).filter(Boolean);
+    if (jugadoresGrupo.length === 0) return;
+    html += `<div class="card">
+      <div class="foursome-tag">Grupo ${gi + 1}</div>
+      <div class="scroll-x">
+        <table class="scorecard">
+          <thead><tr><th style="text-align:left; padding-left:8px;">Jugador</th>${Array.from({length:18},(_,i)=>`<th>${i+1}</th>`).join('')}<th>Tot</th></tr></thead>
+          <tbody>
+            ${jugadoresGrupo.map(j => {
+              const sc = scoresDe(dia.id, j.id);
+              const total = sc.reduce((a,b) => a + (b || 0), 0);
+              return `<tr>
+                <td class="name">${j.nombre.split(' ')[0]}</td>
+                ${sc.map((s, h) => `<td><input type="number" value="${s ?? ''}" onchange="guardarScore('${dia.id}','${j.id}',${h},this.value)" /></td>`).join('')}
+                <td style="font-weight:700;">${total || '—'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  });
+
+  if (dia.foursomes.every(g => g.filter(Boolean).length === 0)) {
+    html += '<div class="empty-state">Configura los foursomes de este día en la pestaña Configuración.</div>';
+  }
+  return html;
+}
+
+function renderTabla() {
+  const tabla = tablaGeneral();
+  if (jugadores.length === 0) return '<div class="empty-state">Agrega jugadores en Configuración para ver la tabla.</div>';
+  return `<div class="card">
+    <h3 class="serif">Tabla General</h3>
+    <p class="muted" style="margin-bottom:6px;">Puntos combinados de los 3 días (1° = 12 pts, cada día puede tener un formato distinto)</p>
+    ${tabla.map((r, i) => `
+      <div class="leader-row">
+        <div class="leader-pos">${i + 1}</div>
+        <div style="flex:1;">
+          <div class="leader-name">${r.nombre}</div>
+          <div class="leader-detail">${r.detalle.map((d,i2)=>`D${i2+1}: ${d.toFixed(1)}`).join(' · ')}</div>
+        </div>
+        <div class="leader-pts">${r.total.toFixed(1)}</div>
+      </div>
+    `).join('')}
+  </div>`;
+}
+
+async function agregarJugador() {
+  const nombre = document.getElementById('nuevo-nombre').value.trim();
+  const hcp = parseFloat(document.getElementById('nuevo-hcp').value) || 0;
+  if (!nombre) return;
+  const { error } = await sb.from('jugadores').insert({ nombre, handicap: hcp });
+  if (error) { toast('Error: ' + error.message); return; }
+  toast('Jugador agregado');
+  cargarTodo();
+}
+window.agregarJugador = agregarJugador;
+
+async function quitarJugador(id) {
+  await sb.from('jugadores').delete().eq('id', id);
+  for (const dia of dias) {
+    const nuevosFoursomes = dia.foursomes.map(g => g.map(x => x === id ? '' : x));
+    await sb.from('dias').update({ foursomes: nuevosFoursomes }).eq('id', dia.id);
+  }
+  cargarTodo();
+}
+window.quitarJugador = quitarJugador;
+
+async function actualizarDia(diaId, campo, valor) {
+  await sb.from('dias').update({ [campo]: valor }).eq('id', diaId);
+  cargarTodo();
+}
+window.actualizarDia = actualizarDia;
+
+async function actualizarArrayDia(diaId, campo, indice, valor) {
+  const dia = dias.find(d => d.id === diaId);
+  const arr = [...dia[campo]];
+  arr[indice] = parseInt(valor) || (campo === 'pares' ? 4 : 1);
+  await sb.from('dias').update({ [campo]: arr }).eq('id', diaId);
+  cargarTodo();
+}
+window.actualizarArrayDia = actualizarArrayDia;
+
+async function asignarFoursome(diaId, grupoIdx, slot, jugadorId) {
+  const dia = dias.find(d => d.id === diaId);
+  const nuevosFoursomes = dia.foursomes.map(g => [...g]);
+  nuevosFoursomes[grupoIdx][slot] = jugadorId;
+  await sb.from('dias').update({ foursomes: nuevosFoursomes }).eq('id', diaId);
+  cargarTodo();
+}
+window.asignarFoursome = asignarFoursome;
+
+async function guardarScore(diaId, jugadorId, holeIdx, valor) {
+  const sc = [...scoresDe(diaId, jugadorId)];
+  sc[holeIdx] = valor === '' ? null : parseInt(valor);
+  const id = diaId + '_' + jugadorId;
+  const { error } = await sb.from('scores').upsert({ id, dia_id: diaId, jugador_id: jugadorId, scores: sc });
+  if (error) { toast('Error al guardar score'); return; }
+  cargarTodo();
+}
+window.guardarScore = guardarScore;
+
+function toggleParesInput(diaId) {
+  const el = document.getElementById('pares-' + diaId);
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+window.toggleParesInput = toggleParesInput;
+
+cargarTodo();
+suscribirRealtime();
+</script>
+</body>
+</html>
