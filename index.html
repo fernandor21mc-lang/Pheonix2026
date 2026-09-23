@@ -151,6 +151,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let jugadores = [];
 let dias = [];
 let scoresRows = [];
+let handicapsRows = [];
 let tab = 'config';
 
 const FORMATOS = { stableford: 'Stableford', net: 'Stroke Play (neto)', skins: 'Skins' };
@@ -167,15 +168,24 @@ function scoresDe(diaId, jugadorId) {
   return row ? row.scores : Array(18).fill(null);
 }
 
+function handicapDe(diaId, jugadorId) {
+  const row = handicapsRows.find(r => r.dia_id === diaId && r.jugador_id === jugadorId);
+  if (row) return row.handicap;
+  const jug = jugadores.find(j => j.id === jugadorId);
+  return jug ? (jug.handicap || 0) : 0; // fallback al hándicap general si no se capturó el de este día
+}
+
 async function cargarTodo() {
-  const [{ data: j }, { data: d }, { data: s }] = await Promise.all([
+  const [{ data: j }, { data: d }, { data: s }, { data: h }] = await Promise.all([
     sb.from('jugadores').select('*').order('nombre'),
     sb.from('dias').select('*').order('orden'),
     sb.from('scores').select('*'),
+    sb.from('handicaps').select('*'),
   ]);
   jugadores = j || [];
   dias = d || [];
   scoresRows = s || [];
+  handicapsRows = h || [];
   render();
 }
 
@@ -184,6 +194,7 @@ function suscribirRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'jugadores' }, cargarTodo)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'dias' }, cargarTodo)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, cargarTodo)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'handicaps' }, cargarTodo)
     .subscribe();
 }
 
@@ -215,7 +226,7 @@ function calcularResultadoDia(dia) {
       const sc = scoresDe(dia.id, jid);
       if (!jug || sc.some(s => s === null || s === undefined)) return;
       const totalBruto = sc.reduce((a, b) => a + b, 0);
-      resultado[jid] = totalBruto - (jug.handicap || 0);
+      resultado[jid] = totalBruto - handicapDe(dia.id, jid);
     });
   } else if (dia.formato === 'stableford') {
     mejorEsMenor = false;
@@ -225,7 +236,7 @@ function calcularResultadoDia(dia) {
       if (!jug || sc.some(s => s === null || s === undefined)) return;
       let pts = 0;
       for (let h = 0; h < 18; h++) {
-        const strokes = strokesEnHoyo(jug.handicap || 0, dia.stroke_index[h]);
+        const strokes = strokesEnHoyo(handicapDe(dia.id, jid), dia.stroke_index[h]);
         const neto = sc[h] - strokes;
         pts += stablefordPts(neto, dia.pares[h]);
       }
@@ -243,7 +254,7 @@ function calcularResultadoDia(dia) {
           const jug = jugadores.find(j => j.id === jid);
           const sc = scoresDe(dia.id, jid);
           if (!jug || sc[h] === null || sc[h] === undefined) return;
-          const strokes = strokesEnHoyo(jug.handicap || 0, dia.stroke_index[h]);
+          const strokes = strokesEnHoyo(handicapDe(dia.id, jid), dia.stroke_index[h]);
           const neto = sc[h] - strokes;
           if (neto < mejorNeto) { mejorNeto = neto; ganador = jid; empatados = 1; }
           else if (neto === mejorNeto) { empatados++; }
@@ -365,6 +376,17 @@ function renderConfig() {
           <tr><td class="name">S.I.</td>${dia.stroke_index.map((s,h)=>`<td><input value="${s}" onchange="actualizarArrayDia('${dia.id}','stroke_index',${h},this.value)"/></td>`).join('')}</tr>
         </tbody></table></div>
       </div>
+      ${dia.foursomes.flat().filter(Boolean).length > 0 ? `
+        <label style="margin-top:14px;">Hándicap de cada jugador en este campo</label>
+        ${dia.foursomes.flat().filter(Boolean).map(jid => {
+          const jug = jugadores.find(j => j.id === jid);
+          if (!jug) return '';
+          return `<div class="row" style="align-items:center; margin-bottom:6px;">
+            <div style="flex:2; font-size:13px;">${jug.nombre}</div>
+            <div style="flex:1;"><input type="number" step="0.1" value="${handicapDe(dia.id, jid)}" onchange="actualizarHandicapDia('${dia.id}','${jid}',this.value)" /></div>
+          </div>`;
+        }).join('')}
+      ` : ''}
     </div>`;
   });
 
@@ -479,6 +501,15 @@ async function guardarScore(diaId, jugadorId, holeIdx, valor) {
   cargarTodo();
 }
 window.guardarScore = guardarScore;
+
+async function actualizarHandicapDia(diaId, jugadorId, valor) {
+  const id = diaId + '_' + jugadorId;
+  const handicap = parseFloat(valor) || 0;
+  const { error } = await sb.from('handicaps').upsert({ id, dia_id: diaId, jugador_id: jugadorId, handicap });
+  if (error) { toast('Error al guardar hándicap'); return; }
+  cargarTodo();
+}
+window.actualizarHandicapDia = actualizarHandicapDia;
 
 function toggleParesInput(diaId) {
   const el = document.getElementById('pares-' + diaId);
