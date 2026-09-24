@@ -34,6 +34,12 @@
   }
   header h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
   header p { margin: 2px 0 0; font-size: 12.5px; color: #C9DDCE; }
+  header { position: relative; }
+  .admin-btn {
+    position: absolute; right: 16px; top: calc(18px + env(safe-area-inset-top, 0px));
+    background: none; border: 1px solid rgba(245,240,227,0.35); color: #C9DDCE;
+    border-radius: 16px; padding: 4px 10px; font-size: 11.5px; cursor: pointer; font-family: inherit;
+  }
 
   nav {
     display: flex; overflow-x: auto; background: var(--fairway-light);
@@ -137,6 +143,7 @@
 <header>
   <h1 class="serif">⛳ Viaje de Golf</h1>
   <p id="subtitulo">3 días · 3 campos · 12 jugadores</p>
+  <button class="admin-btn" id="admin-btn" onclick="clickAdmin()">Admin</button>
 </header>
 
 <nav id="nav"></nav>
@@ -153,7 +160,8 @@ let dias = [];
 let scoresRows = [];
 let handicapsRows = [];
 let parejasRows = [];
-let tab = 'config';
+let tab = null;
+let esAdmin = false;
 
 const FORMATOS = { stableford: 'Stableford', net: 'Stroke Play (neto)', skins: 'Skins' };
 
@@ -312,8 +320,13 @@ function render() {
   document.getElementById('subtitulo').textContent = `${jugadores.length} jugadores`;
 
   const navEl = document.getElementById('nav');
+  document.getElementById('admin-btn').textContent = esAdmin ? 'Salir' : 'Admin';
+
+  // Solo el admin ve y puede abrir Configuración
+  if (!tab || (tab === 'config' && !esAdmin)) tab = dias.length ? dias[0].id : 'tabla';
+
   const tabs = [
-    { id: 'config', label: 'Configuración' },
+    ...(esAdmin ? [{ id: 'config', label: 'Configuración' }] : []),
     ...dias.map((d, i) => ({ id: d.id, label: `Día ${i + 1}` })),
     { id: 'tabla', label: 'Tabla General' },
   ];
@@ -322,13 +335,52 @@ function render() {
   ).join('');
 
   const main = document.getElementById('main');
-  if (tab === 'config') main.innerHTML = renderConfig();
+  if (tab === 'login') main.innerHTML = renderLogin();
+  else if (tab === 'config' && esAdmin) main.innerHTML = renderConfig();
   else if (tab === 'tabla') main.innerHTML = renderTabla();
   else main.innerHTML = renderDia(dias.find(d => d.id === tab));
 }
 
 function setTab(t) { tab = t; render(); }
 window.setTab = setTab;
+
+// ---------- Acceso admin ----------
+function renderLogin() {
+  return `<div class="card">
+    <h3>Acceso admin</h3>
+    <p class="muted" style="margin:0 0 12px;">Solo el organizador puede entrar a Configuración.</p>
+    <div class="row"><div><label>Correo</label><input id="login-email" type="email" autocomplete="username" /></div></div>
+    <div class="row"><div><label>Contraseña</label><input id="login-pass" type="password" autocomplete="current-password" /></div></div>
+    <button class="primary" onclick="entrarAdmin()" style="width:100%;">Entrar</button>
+  </div>`;
+}
+
+async function clickAdmin() {
+  if (esAdmin) {
+    await sb.auth.signOut();
+    toast('Sesión cerrada');
+    return;
+  }
+  tab = 'login';
+  render();
+}
+window.clickAdmin = clickAdmin;
+
+async function entrarAdmin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-pass').value;
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) { toast('Correo o contraseña incorrectos'); return; }
+  tab = 'config';
+  toast('Bienvenido');
+}
+window.entrarAdmin = entrarAdmin;
+
+sb.auth.onAuthStateChange((_evento, session) => {
+  esAdmin = !!session;
+  if (!esAdmin && (tab === 'config')) tab = null;
+  render();
+});
 
 function renderConfig() {
   let html = `<div class="card">
@@ -449,14 +501,14 @@ function renderDia(dia) {
   });
 
   if (dia.foursomes.every(g => g.filter(Boolean).length === 0)) {
-    html += '<div class="empty-state">Configura los foursomes de este día en la pestaña Configuración.</div>';
+    html += '<div class="empty-state">Los foursomes de este día todavía no están definidos.</div>';
   }
   return html;
 }
 
 function renderTabla() {
   const tabla = tablaGeneral();
-  if (jugadores.length === 0) return '<div class="empty-state">Agrega jugadores en Configuración para ver la tabla.</div>';
+  if (jugadores.length === 0) return '<div class="empty-state">Todavía no hay jugadores cargados.</div>';
   return `<div class="card">
     <h3 class="serif">Tabla General</h3>
     <p class="muted" style="margin-bottom:6px;">Puntos combinados de los 3 días (1° = 12 pts, cada día puede tener un formato distinto)</p>
@@ -474,6 +526,7 @@ function renderTabla() {
 }
 
 async function agregarJugador() {
+  if (!esAdmin) return;
   const nombre = document.getElementById('nuevo-nombre').value.trim();
   if (!nombre) return;
   const { error } = await sb.from('jugadores').insert({ nombre, handicap: 0 });
@@ -485,6 +538,7 @@ async function agregarJugador() {
 window.agregarJugador = agregarJugador;
 
 async function quitarJugador(id) {
+  if (!esAdmin) return;
   await sb.from('jugadores').delete().eq('id', id);
   for (const dia of dias) {
     const nuevosFoursomes = dia.foursomes.map(g => g.map(x => x === id ? '' : x));
@@ -495,12 +549,14 @@ async function quitarJugador(id) {
 window.quitarJugador = quitarJugador;
 
 async function actualizarDia(diaId, campo, valor) {
+  if (!esAdmin) return;
   await sb.from('dias').update({ [campo]: valor }).eq('id', diaId);
   cargarTodo();
 }
 window.actualizarDia = actualizarDia;
 
 async function actualizarArrayDia(diaId, campo, indice, valor) {
+  if (!esAdmin) return;
   const dia = dias.find(d => d.id === diaId);
   const arr = [...dia[campo]];
   arr[indice] = parseInt(valor) || (campo === 'pares' ? 4 : 1);
@@ -510,6 +566,7 @@ async function actualizarArrayDia(diaId, campo, indice, valor) {
 window.actualizarArrayDia = actualizarArrayDia;
 
 async function asignarFoursome(diaId, grupoIdx, slot, jugadorId) {
+  if (!esAdmin) return;
   const dia = dias.find(d => d.id === diaId);
   const nuevosFoursomes = dia.foursomes.map(g => [...g]);
   nuevosFoursomes[grupoIdx][slot] = jugadorId;
@@ -536,6 +593,7 @@ async function guardarGanadorPareja(parejaId, valor) {
 window.guardarGanadorPareja = guardarGanadorPareja;
 
 async function actualizarHandicapDia(diaId, jugadorId, valor) {
+  if (!esAdmin) return;
   const id = diaId + '_' + jugadorId;
   const handicap = parseFloat(valor) || 0;
   const { error } = await sb.from('handicaps').upsert({ id, dia_id: diaId, jugador_id: jugadorId, handicap });
