@@ -158,6 +158,38 @@
   .reglas .nota { font-size: 12px; color: #7A7264; line-height: 1.5; margin: 12px 0 0; }
   .reglas .nota b { color: var(--ink); font-weight: 600; }
 
+  /* Inicio */
+  .hero { text-align: center; padding: 22px 18px 20px; background: #F9F0DF; }
+  .hero img { width: 170px; height: 170px; display: block; margin: 0 auto 8px; }
+  .hero h2 { margin: 0; font-size: 26px; color: var(--fairway); font-weight: 700; }
+  .hero .fechas { margin: 4px 0 12px; color: var(--clay); font-weight: 600; font-size: 13.5px; }
+  .hero p.bienv { margin: 0 auto; max-width: 480px; font-size: 14px; line-height: 1.55; color: #4A4F45; }
+  .sec-titulo { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 600; color: var(--fairway); margin: 22px 2px 10px; }
+  .dia-card { display: flex; gap: 14px; align-items: flex-start; cursor: pointer; }
+  .dia-card:hover { border-color: var(--moss); }
+  .dia-fecha { flex-shrink: 0; width: 58px; text-align: center; background: var(--fairway); color: #F5F0E3; border-radius: 9px; padding: 8px 0 7px; }
+  .dia-fecha .dnum { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 700; line-height: 1; }
+  .dia-fecha .dmes { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 3px; }
+  .dia-fecha .dsem { font-size: 10px; opacity: 0.75; margin-top: 1px; }
+  .dia-info { flex: 1; min-width: 0; }
+  .dia-info .dlabel { font-size: 11px; font-weight: 700; color: var(--clay); text-transform: uppercase; letter-spacing: 0.04em; }
+  .dia-info .dcampo { font-family: 'Fraunces', serif; font-size: 16.5px; font-weight: 600; margin: 1px 0 6px; }
+  .tag { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 20px; margin: 0 4px 4px 0; }
+  .tag.fmt { background: #E8F0E9; color: var(--fairway); }
+  .tag.par { background: #F0EBDC; color: #6B5E45; }
+  .tag.x2 { background: var(--clay); color: #fff; }
+  .dia-info .ddesc { font-size: 12.5px; color: #6E685C; line-height: 1.45; margin-top: 4px; }
+  .jug-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .jug-item { display: flex; align-items: center; gap: 9px; background: var(--paper); border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; }
+  .jug-item .ini { width: 32px; height: 32px; border-radius: 50%; background: #F0EBDC; color: var(--fairway); font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .jug-item .nom { font-size: 13px; font-weight: 600; line-height: 1.2; }
+  .jug-item .apodo { font-size: 11px; color: var(--clay); }
+  .formato-lista { margin: 0; padding: 0; list-style: none; }
+  .formato-lista li { padding: 9px 0; border-top: 1px solid #EEE8D9; font-size: 13px; line-height: 1.45; color: #4A4F45; }
+  .formato-lista li:first-child { border-top: none; padding-top: 0; }
+  .formato-lista b { color: var(--fairway); }
+  .cta { display: block; width: 100%; margin-top: 6px; }
+
   .day-summary-pill {
     display: inline-block; font-size: 11px; padding: 3px 9px; border-radius: 20px;
     background: #E8F0E9; color: var(--fairway); font-weight: 600; margin-bottom: 10px;
@@ -213,6 +245,26 @@ let tab = null;
 let esAdmin = false;
 
 const FORMATOS = { stableford: 'Stableford', net: 'Stroke Play (neto)', skins: 'Skins' };
+const DESC_FORMATO = {
+  stableford: 'Puntos por hoyo contra el par con tu hándicap: bogey 1, par 2, birdie 3, águila 4. Gana quien sume más.',
+  net: 'Golpes totales menos tu hándicap del día. Gana el score neto más bajo.',
+  skins: 'Hoyo por hoyo dentro de tu foursome: el mejor neto sin empate se lleva el skin. Gana quien junte más skins.',
+};
+// Apodos (solo para mostrar)
+const APODOS = {
+  'Alejandro Aceves': 'Chapo',
+  'Juan Pablo Franco': 'Papo',
+  'Jorge Carrera': 'Carrera',
+  'Gabriel Camou': 'Camou',
+};
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const SEMANA = ['dom','lun','mar','mié','jue','vie','sáb'];
+function partesFecha(iso) {
+  if (!iso) return null;
+  const [y, m, d] = iso.split('-').map(Number);
+  const f = new Date(y, m - 1, d);
+  return { dia: d, mes: MESES[m - 1], sem: SEMANA[f.getDay()] };
+}
 
 // ---------- Sistema de puntos ----------
 // Puntos por lugar en el individual (1° a 12°). Empates: se promedian los lugares.
@@ -403,12 +455,13 @@ function render() {
   document.getElementById('admin-btn').textContent = esAdmin ? 'Salir' : 'Admin';
 
   // Solo el admin ve y puede abrir Configuración
-  if (!tab || (tab === 'config' && !esAdmin)) tab = dias.length ? dias[0].id : 'tabla';
+  if (!tab || (tab === 'config' && !esAdmin)) tab = 'inicio';
 
   const tabs = [
-    ...(esAdmin ? [{ id: 'config', label: 'Configuración' }] : []),
+    { id: 'inicio', label: 'Inicio' },
     ...dias.map((d, i) => ({ id: d.id, label: `Día ${i + 1}` })),
     { id: 'tabla', label: 'Tabla General' },
+    ...(esAdmin ? [{ id: 'config', label: 'Configuración' }] : []),
   ];
   navEl.innerHTML = tabs.map(t =>
     `<button class="${tab === t.id ? 'active' : ''}" onclick="setTab('${t.id}')">${t.label}</button>`
@@ -416,13 +469,72 @@ function render() {
 
   const main = document.getElementById('main');
   main.classList.toggle('ancho', tab === 'tabla');
-  if (tab === 'login') main.innerHTML = renderLogin();
+  if (tab === 'inicio') main.innerHTML = renderInicio();
+  else if (tab === 'login') main.innerHTML = renderLogin();
   else if (tab === 'config' && esAdmin) main.innerHTML = renderConfig();
   else if (tab === 'tabla') main.innerHTML = renderTabla();
   else main.innerHTML = renderDia(dias.find(d => d.id === tab));
 }
 
-function setTab(t) { tab = t; render(); }
+function setTab(t) { tab = t; render(); window.scrollTo(0, 0); }
+
+// ---------- Inicio ----------
+function renderInicio() {
+  const f1 = partesFecha(dias[0]?.fecha), fN = partesFecha(dias[dias.length - 1]?.fecha);
+  const rango = f1 && fN
+    ? (f1.mes === fN.mes ? `${f1.dia} al ${fN.dia} de ${fN.mes}` : `${f1.dia} ${f1.mes} al ${fN.dia} ${fN.mes}`) + ' · Scottsdale, AZ'
+    : 'Scottsdale, AZ';
+  const iniciales = n => n.split(' ').map(x => x[0]).slice(0, 2).join('').toUpperCase();
+
+  const cardsDias = dias.map((d, i) => {
+    const f = partesFecha(d.fecha);
+    return `<div class="card dia-card" onclick="setTab('${d.id}')">
+      <div class="dia-fecha">
+        ${f ? `<div class="dnum">${f.dia}</div><div class="dmes">${f.mes}</div><div class="dsem">${f.sem}</div>` : `<div class="dnum">${i + 1}</div>`}
+      </div>
+      <div class="dia-info">
+        <div class="dlabel">Día ${i + 1}</div>
+        <div class="dcampo">${d.campo || 'Campo por definir'}</div>
+        <span class="tag fmt">${FORMATOS[d.formato] || ''}</span>
+        <span class="tag par">Match de parejas</span>
+        ${multiplicadorDia(d) === 2 ? '<span class="tag x2">Puntos dobles</span>' : ''}
+        <div class="ddesc">${DESC_FORMATO[d.formato] || ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const listaJug = jugadores.map(j => `
+    <div class="jug-item">
+      <div class="ini">${iniciales(j.nombre)}</div>
+      <div><div class="nom">${j.nombre}</div>${APODOS[j.nombre] ? `<div class="apodo">"${APODOS[j.nombre]}"</div>` : ''}</div>
+    </div>`).join('');
+
+  return `
+  <div class="card hero">
+    <img src="logo.png" alt="Phoenix Open">
+    <h2 class="serif">Bienvenidos al Phoenix Open 2026</h2>
+    <div class="fechas">${rango}</div>
+    <p class="bienv">${jugadores.length} jugadores, ${dias.length} días y ${dias.length} de los mejores campos del desierto de Arizona. Cada día se juega individual y en parejas, y todo suma para un solo campeón. Nadie está fuera hasta el último hoyo: el día final vale doble.</p>
+  </div>
+
+  <div class="sec-titulo">Los campos</div>
+  ${cardsDias}
+
+  <div class="sec-titulo">Cómo se juega</div>
+  <div class="card">
+    <ul class="formato-lista">
+      <li><b>Torneo individual.</b> Cada día se juega un formato distinto con hándicap. Según tu lugar del día sumas puntos: 1° = 100, 2° = 90… hasta 12° = 30.</li>
+      <li><b>Match de parejas.</b> Dentro de cada foursome se juega 2 vs 2, bola baja y bola alta con hándicap. Las parejas cambian cada día y nunca se repiten. Ganar suma 25 puntos a cada jugador.</li>
+      <li><b>El último día vale doble.</b> Todos llegan con chance al final.</li>
+      <li><b>Un solo campeón:</b> el que más puntos junte en los ${dias.length} días.</li>
+    </ul>
+    <button class="secondary cta" onclick="setTab('tabla')">Ver Tabla General</button>
+  </div>
+
+  <div class="sec-titulo">Los jugadores</div>
+  <div class="jug-grid">${listaJug}</div>
+  `;
+}
 window.setTab = setTab;
 
 // ---------- Acceso admin ----------
