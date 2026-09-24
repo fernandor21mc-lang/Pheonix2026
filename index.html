@@ -152,6 +152,7 @@ let jugadores = [];
 let dias = [];
 let scoresRows = [];
 let handicapsRows = [];
+let parejasRows = [];
 let tab = 'config';
 
 const FORMATOS = { stableford: 'Stableford', net: 'Stroke Play (neto)', skins: 'Skins' };
@@ -176,16 +177,18 @@ function handicapDe(diaId, jugadorId) {
 }
 
 async function cargarTodo() {
-  const [{ data: j }, { data: d }, { data: s }, { data: h }] = await Promise.all([
+  const [{ data: j }, { data: d }, { data: s }, { data: h }, { data: p }] = await Promise.all([
     sb.from('jugadores').select('*').order('nombre'),
     sb.from('dias').select('*').order('orden'),
     sb.from('scores').select('*'),
     sb.from('handicaps').select('*'),
+    sb.from('parejas_dia').select('*').order('grupo_idx'),
   ]);
   jugadores = j || [];
   dias = d || [];
   scoresRows = s || [];
   handicapsRows = h || [];
+  parejasRows = p || [];
   render();
 }
 
@@ -195,6 +198,7 @@ function suscribirRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'dias' }, cargarTodo)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, cargarTodo)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'handicaps' }, cargarTodo)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'parejas_dia' }, cargarTodo)
     .subscribe();
 }
 
@@ -400,8 +404,31 @@ function renderDia(dia) {
   dia.foursomes.forEach((grupo, gi) => {
     const jugadoresGrupo = grupo.map(jid => jugadores.find(j => j.id === jid)).filter(Boolean);
     if (jugadoresGrupo.length === 0) return;
+
+    const pareja = parejasRows.find(p => p.dia_id === dia.id && p.grupo_idx === gi);
+    let htmlParejas = '';
+    if (pareja) {
+      const nombreDe = jid => jugadores.find(j => j.id === jid)?.nombre.split(' ')[0] || '?';
+      const [a1, a2] = pareja.pareja_a;
+      const [b1, b2] = pareja.pareja_b;
+      htmlParejas = `
+        <div class="foursome-tag" style="color:var(--moss); margin-top:2px;">⛳ Match de parejas (bola baja + bola alta)</div>
+        <div class="row" style="align-items:center; margin-bottom:10px;">
+          <div style="flex:1; font-size:13.5px; font-weight:600;">${nombreDe(a1)} + ${nombreDe(a2)}</div>
+          <div style="font-size:11px; color:#9A927F;">vs</div>
+          <div style="flex:1; font-size:13.5px; font-weight:600; text-align:right;">${nombreDe(b1)} + ${nombreDe(b2)}</div>
+        </div>
+        <select onchange="guardarGanadorPareja('${pareja.id}',this.value)" style="margin-bottom:14px;">
+          <option value="" ${!pareja.ganador ? 'selected' : ''}>¿Quién ganó el match?</option>
+          <option value="a" ${pareja.ganador==='a'?'selected':''}>Ganó ${nombreDe(a1)} + ${nombreDe(a2)}</option>
+          <option value="b" ${pareja.ganador==='b'?'selected':''}>Ganó ${nombreDe(b1)} + ${nombreDe(b2)}</option>
+          <option value="empate" ${pareja.ganador==='empate'?'selected':''}>Empate</option>
+        </select>`;
+    }
+
     html += `<div class="card">
       <div class="foursome-tag">Grupo ${gi + 1}</div>
+      ${htmlParejas}
       <div class="scroll-x">
         <table class="scorecard">
           <thead><tr><th style="text-align:left; padding-left:8px;">Jugador</th>${Array.from({length:18},(_,i)=>`<th>${i+1}</th>`).join('')}<th>Tot</th></tr></thead>
@@ -500,6 +527,13 @@ async function guardarScore(diaId, jugadorId, holeIdx, valor) {
   cargarTodo();
 }
 window.guardarScore = guardarScore;
+
+async function guardarGanadorPareja(parejaId, valor) {
+  const { error } = await sb.from('parejas_dia').update({ ganador: valor || null }).eq('id', parejaId);
+  if (error) { toast('Error al guardar'); return; }
+  cargarTodo();
+}
+window.guardarGanadorPareja = guardarGanadorPareja;
 
 async function actualizarHandicapDia(diaId, jugadorId, valor) {
   const id = diaId + '_' + jugadorId;
