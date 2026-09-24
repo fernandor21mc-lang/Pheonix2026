@@ -112,6 +112,32 @@
   .leader-pts { font-size: 17px; font-weight: 700; color: var(--fairway); font-family: 'Fraunces', serif; }
   .leader-detail { font-size: 11px; color: #7A7264; margin-top: 1px; }
 
+  /* Tabla general */
+  .tabla-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -16px; padding: 0 16px; }
+  table.tg { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; }
+  table.tg th, table.tg td { padding: 9px 8px; text-align: center; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.tg thead th { font-size: 10.5px; font-weight: 600; color: #7A7264; background: #FAF7EF; }
+  table.tg thead tr.dias th { font-size: 11.5px; color: var(--fairway); border-bottom: none; padding-bottom: 2px; }
+  table.tg thead tr.dias th .fmt { display: block; font-size: 10px; font-weight: 500; color: var(--moss); text-transform: uppercase; letter-spacing: 0.03em; }
+  table.tg th.dia-sep, table.tg td.dia-sep { border-left: 1px solid var(--line); }
+  table.tg td.jug, table.tg th.jug { text-align: left; position: sticky; left: 0; background: var(--paper); z-index: 1; font-weight: 600; font-size: 13.5px; }
+  table.tg thead th.jug { background: #FAF7EF; }
+  table.tg td.pos { width: 34px; padding-right: 0; }
+  table.tg td.pos span {
+    display: inline-flex; width: 24px; height: 24px; border-radius: 50%; align-items: center; justify-content: center;
+    background: #F0EBDC; color: var(--fairway); font-size: 11.5px; font-weight: 700;
+  }
+  table.tg tbody tr:first-child td.pos span { background: var(--clay); color: #fff; }
+  table.tg td.ind { color: var(--ink); }
+  table.tg td.par { color: var(--moss); }
+  table.tg td.vacio { color: #C9C1AE; }
+  table.tg td.subt { font-weight: 600; background: #FBF9F3; }
+  table.tg td.total, table.tg th.total { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 700; color: var(--fairway); border-left: 2px solid var(--line); }
+  table.tg thead th.total { font-family: inherit; font-size: 11.5px; }
+  table.tg tbody tr:last-child td { border-bottom: none; }
+  .reglas { font-size: 12px; color: #7A7264; line-height: 1.55; }
+  .reglas b { color: var(--ink); font-weight: 600; }
+
   .day-summary-pill {
     display: inline-block; font-size: 11px; padding: 3px 9px; border-radius: 20px;
     background: #E8F0E9; color: var(--fairway); font-weight: 600; margin-bottom: 10px;
@@ -336,10 +362,11 @@ function tablaGeneral() {
     const ind = puntosDelDia(dia);
     const par = puntosParejasDelDia(dia);
     jugadores.forEach(j => {
-      const pi = ind[j.id] || 0, pp = par[j.id] || 0;
-      totales[j.id].total += pi + pp;
+      const pi = (j.id in ind) ? ind[j.id] : null;
+      const pp = (j.id in par) ? par[j.id] : null;
+      totales[j.id].total += (pi || 0) + (pp || 0);
       totales[j.id].detalle.push({ ind: pi, par: pp });
-      if (idx === dias.length - 1) totales[j.id].ultimoDia = pi + pp;
+      if (idx === dias.length - 1) totales[j.id].ultimoDia = (pi || 0) + (pp || 0);
     });
   });
   // Desempate: mejor resultado del último día
@@ -539,19 +566,43 @@ function renderDia(dia) {
 function renderTabla() {
   const tabla = tablaGeneral();
   if (jugadores.length === 0) return '<div class="empty-state">Todavía no hay jugadores cargados.</div>';
+  const celda = (v, cls) => v === null
+    ? `<td class="${cls} vacio">–</td>`
+    : `<td class="${cls}">${fmt(v)}</td>`;
+
+  const headDias = dias.map((d, i) => `
+    <th colspan="3" class="dia-sep">Día ${i + 1}${multiplicadorDia(d) === 2 ? ' · x2' : ''}
+      <span class="fmt">${FORMATOS[d.formato] || ''}</span></th>`).join('');
+  const headSub = dias.map(() => `<th class="dia-sep">Indiv.</th><th>Parejas</th><th>Día</th>`).join('');
+
+  const filas = tabla.map((r, i) => `
+    <tr>
+      <td class="pos"><span>${i + 1}</span></td>
+      <td class="jug">${r.nombre}</td>
+      ${r.detalle.map(d => {
+        const sub = (d.ind === null && d.par === null) ? null : (d.ind || 0) + (d.par || 0);
+        return celda(d.ind, 'ind dia-sep') + celda(d.par, 'par') + celda(sub, 'subt');
+      }).join('')}
+      <td class="total">${fmt(r.total)}</td>
+    </tr>`).join('');
+
   return `<div class="card">
-    <h3 class="serif">Tabla General</h3>
-    <p class="muted" style="margin-bottom:6px;">Individual: 1° = 100 · 2° = 90 · 3° = 82 · 4° = 75 · 5° = 68 · 6° = 62 · 7° = 56 · 8° = 50 · 9° = 45 · 10° = 40 · 11° = 35 · 12° = 30.<br>Parejas: gana 25 · empate 12.5 · pierde 0. <b>El último día vale doble.</b> Desempate: mejor resultado del último día.</p>
-    ${tabla.map((r, i) => `
-      <div class="leader-row">
-        <div class="leader-pos">${i + 1}</div>
-        <div style="flex:1;">
-          <div class="leader-name">${r.nombre}</div>
-          <div class="leader-detail">${r.detalle.map((d,i2)=>`D${i2+1}: ${fmt(d.ind)}${d.par ? ' + ' + fmt(d.par) + ' par' : ''}`).join(' · ')}</div>
-        </div>
-        <div class="leader-pts">${fmt(r.total)}</div>
-      </div>
-    `).join('')}
+    <h3 class="serif" style="margin-bottom:12px;">Tabla General</h3>
+    <div class="tabla-wrap">
+      <table class="tg">
+        <thead>
+          <tr class="dias"><th></th><th class="jug"></th>${headDias}<th class="total"></th></tr>
+          <tr><th></th><th class="jug">Jugador</th>${headSub}<th class="total">Total</th></tr>
+        </thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card reglas">
+    <b>Cómo se calculan los puntos</b><br>
+    <b>Individual</b> por lugar del día: 1° 100 · 2° 90 · 3° 82 · 4° 75 · 5° 68 · 6° 62 · 7° 56 · 8° 50 · 9° 45 · 10° 40 · 11° 35 · 12° 30. Empates reparten los puntos.<br>
+    <b>Parejas</b>: gana 25 · empate 12.5 · pierde 0 (a cada jugador).<br>
+    <b>El último día vale doble.</b> Desempate: mejor resultado del último día.
   </div>`;
 }
 
