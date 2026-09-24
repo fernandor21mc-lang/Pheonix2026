@@ -183,7 +183,6 @@
   .jug-item { display: flex; align-items: center; gap: 9px; background: var(--paper); border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; }
   .jug-item .ini { width: 32px; height: 32px; border-radius: 50%; background: #F0EBDC; color: var(--fairway); font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .jug-item .nom { font-size: 13px; font-weight: 600; line-height: 1.2; }
-  .jug-item .apodo { font-size: 11px; color: var(--clay); }
   .formato-lista { margin: 0; padding: 0; list-style: none; }
   .formato-lista li { padding: 9px 0; border-top: 1px solid #EEE8D9; font-size: 13px; line-height: 1.45; color: #4A4F45; }
   .formato-lista li:first-child { border-top: none; padding-top: 0; }
@@ -250,13 +249,8 @@ const DESC_FORMATO = {
   net: 'Golpes totales menos tu hándicap del día. Gana el score neto más bajo.',
   skins: 'Hoyo por hoyo dentro de tu foursome: el mejor neto sin empate se lleva el skin. Gana quien junte más skins.',
 };
-// Apodos (solo para mostrar)
-const APODOS = {
-  'Alejandro Aceves': 'Chapo',
-  'Juan Pablo Franco': 'Papo',
-  'Jorge Carrera': 'Carrera',
-  'Gabriel Camou': 'Camou',
-};
+// Fechas del viaje (los días de juego salen de Configuración)
+const FECHAS_VIAJE = '7 al 12 de octubre · Scottsdale, AZ';
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const SEMANA = ['dom','lun','mar','mié','jue','vie','sáb'];
 function partesFecha(iso) {
@@ -480,10 +474,7 @@ function setTab(t) { tab = t; render(); window.scrollTo(0, 0); }
 
 // ---------- Inicio ----------
 function renderInicio() {
-  const f1 = partesFecha(dias[0]?.fecha), fN = partesFecha(dias[dias.length - 1]?.fecha);
-  const rango = f1 && fN
-    ? (f1.mes === fN.mes ? `${f1.dia} al ${fN.dia} de ${fN.mes}` : `${f1.dia} ${f1.mes} al ${fN.dia} ${fN.mes}`) + ' · Scottsdale, AZ'
-    : 'Scottsdale, AZ';
+  const rango = FECHAS_VIAJE;
   const iniciales = n => n.split(' ').map(x => x[0]).slice(0, 2).join('').toUpperCase();
 
   const cardsDias = dias.map((d, i) => {
@@ -506,7 +497,7 @@ function renderInicio() {
   const listaJug = jugadores.map(j => `
     <div class="jug-item">
       <div class="ini">${iniciales(j.nombre)}</div>
-      <div><div class="nom">${j.nombre}</div>${APODOS[j.nombre] ? `<div class="apodo">"${APODOS[j.nombre]}"</div>` : ''}</div>
+      <div class="nom">${j.nombre}</div>
     </div>`).join('');
 
   return `
