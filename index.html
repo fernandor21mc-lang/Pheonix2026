@@ -165,6 +165,18 @@ let esAdmin = false;
 
 const FORMATOS = { stableford: 'Stableford', net: 'Stroke Play (neto)', skins: 'Skins' };
 
+// ---------- Sistema de puntos ----------
+// Puntos por lugar en el individual (1° a 12°). Empates: se promedian los lugares.
+const PUNTOS_LUGAR = [100, 90, 82, 75, 68, 62, 56, 50, 45, 40, 35, 30];
+// Match de parejas (a cada jugador de la pareja)
+const PUNTOS_PAREJA = { gana: 25, empate: 12.5, pierde: 0 };
+// El último día vale doble
+function multiplicadorDia(dia) {
+  const idx = dias.findIndex(d => d.id === dia.id);
+  return idx === dias.length - 1 ? 2 : 1;
+}
+function fmt(n) { return Number.isInteger(n) ? String(n) : n.toFixed(1); }
+
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -294,26 +306,44 @@ function puntosDelDia(dia) {
     let j = i;
     while (j + 1 < entries.length && entries[j + 1][1] === entries[i][1]) j++;
     const rangoPts = [];
-    for (let k = i; k <= j; k++) rangoPts.push(12 - k);
+    for (let k = i; k <= j; k++) rangoPts.push(PUNTOS_LUGAR[k] ?? 0);
     const promedio = rangoPts.reduce((a, b) => a + b, 0) / rangoPts.length;
-    for (let k = i; k <= j; k++) puntos[entries[k][0]] = promedio;
+    for (let k = i; k <= j; k++) puntos[entries[k][0]] = promedio * multiplicadorDia(dia);
     i = j + 1;
   }
   return puntos;
 }
 
+function puntosParejasDelDia(dia) {
+  const m = multiplicadorDia(dia);
+  const puntos = {};
+  parejasRows.filter(p => p.dia_id === dia.id && p.ganador).forEach(p => {
+    const a = p.pareja_a || [], b = p.pareja_b || [];
+    let pa = 0, pb = 0;
+    if (p.ganador === 'a') { pa = PUNTOS_PAREJA.gana; pb = PUNTOS_PAREJA.pierde; }
+    else if (p.ganador === 'b') { pa = PUNTOS_PAREJA.pierde; pb = PUNTOS_PAREJA.gana; }
+    else if (p.ganador === 'empate') { pa = pb = PUNTOS_PAREJA.empate; }
+    a.forEach(jid => { puntos[jid] = (puntos[jid] || 0) + pa * m; });
+    b.forEach(jid => { puntos[jid] = (puntos[jid] || 0) + pb * m; });
+  });
+  return puntos;
+}
+
 function tablaGeneral() {
   const totales = {};
-  jugadores.forEach(j => { totales[j.id] = { nombre: j.nombre, total: 0, detalle: [] }; });
-  dias.forEach(dia => {
-    const pts = puntosDelDia(dia);
+  jugadores.forEach(j => { totales[j.id] = { nombre: j.nombre, total: 0, detalle: [], ultimoDia: 0 }; });
+  dias.forEach((dia, idx) => {
+    const ind = puntosDelDia(dia);
+    const par = puntosParejasDelDia(dia);
     jugadores.forEach(j => {
-      const p = pts[j.id] || 0;
-      totales[j.id].total += p;
-      totales[j.id].detalle.push(p);
+      const pi = ind[j.id] || 0, pp = par[j.id] || 0;
+      totales[j.id].total += pi + pp;
+      totales[j.id].detalle.push({ ind: pi, par: pp });
+      if (idx === dias.length - 1) totales[j.id].ultimoDia = pi + pp;
     });
   });
-  return Object.values(totales).sort((a, b) => b.total - a.total);
+  // Desempate: mejor resultado del último día
+  return Object.values(totales).sort((a, b) => (b.total - a.total) || (b.ultimoDia - a.ultimoDia));
 }
 
 function render() {
@@ -451,7 +481,7 @@ function renderConfig() {
 function renderDia(dia) {
   if (!dia) return '<div class="empty-state">Día no encontrado</div>';
   let html = `<div class="day-summary-pill">${dia.campo || 'Campo sin definir'} ${dia.fecha ? '· ' + dia.fecha : ''}</div>
-    <div class="format-pill" style="margin-bottom:14px;">Formato: ${FORMATOS[dia.formato]}</div>`;
+    <div class="format-pill" style="margin-bottom:14px;">Formato: ${FORMATOS[dia.formato]}${multiplicadorDia(dia) === 2 ? ' · Puntos dobles' : ''}</div>`;
 
   dia.foursomes.forEach((grupo, gi) => {
     const jugadoresGrupo = grupo.map(jid => jugadores.find(j => j.id === jid)).filter(Boolean);
@@ -511,15 +541,15 @@ function renderTabla() {
   if (jugadores.length === 0) return '<div class="empty-state">Todavía no hay jugadores cargados.</div>';
   return `<div class="card">
     <h3 class="serif">Tabla General</h3>
-    <p class="muted" style="margin-bottom:6px;">Puntos combinados de los 3 días (1° = 12 pts, cada día puede tener un formato distinto)</p>
+    <p class="muted" style="margin-bottom:6px;">Individual: 1° = 100 · 2° = 90 · 3° = 82 · 4° = 75 · 5° = 68 · 6° = 62 · 7° = 56 · 8° = 50 · 9° = 45 · 10° = 40 · 11° = 35 · 12° = 30.<br>Parejas: gana 25 · empate 12.5 · pierde 0. <b>El último día vale doble.</b> Desempate: mejor resultado del último día.</p>
     ${tabla.map((r, i) => `
       <div class="leader-row">
         <div class="leader-pos">${i + 1}</div>
         <div style="flex:1;">
           <div class="leader-name">${r.nombre}</div>
-          <div class="leader-detail">${r.detalle.map((d,i2)=>`D${i2+1}: ${d.toFixed(1)}`).join(' · ')}</div>
+          <div class="leader-detail">${r.detalle.map((d,i2)=>`D${i2+1}: ${fmt(d.ind)}${d.par ? ' + ' + fmt(d.par) + ' par' : ''}`).join(' · ')}</div>
         </div>
-        <div class="leader-pts">${r.total.toFixed(1)}</div>
+        <div class="leader-pts">${fmt(r.total)}</div>
       </div>
     `).join('')}
   </div>`;
